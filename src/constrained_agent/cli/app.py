@@ -95,6 +95,10 @@ def run(
 ) -> None:
     """Execute a run against a target repository."""
     del ctx, model
+    supported_agents = {"scripted", "google-adk", "replay"}
+    if agent not in supported_agents:
+        choices = ", ".join(sorted(supported_agents))
+        raise typer.BadParameter(f"unsupported agent {agent!r}; choose one of: {choices}")
     console.print(
         f"[yellow]run: {goal} repo={repo} agent={agent} mode={mode} (not yet implemented)[/yellow]"
     )

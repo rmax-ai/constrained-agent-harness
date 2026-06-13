@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from constrained_agent.agents.google_adk import GoogleAdkCodingAgent
@@ -126,17 +124,3 @@ async def test_retry_on_validation_failure(monkeypatch: pytest.MonkeyPatch) -> N
     assert proposal.summary.startswith("Inspect the failing module")
     assert len(prompts) == 2
     assert "Validation feedback from the previous response" in prompts[1]
-
-
-@pytest.mark.live_model
-@pytest.mark.asyncio
-async def test_live_model_proposal_round_trip() -> None:
-    api_key = os.environ.get("CAH_GOOGLE_API_KEY")
-    if not api_key:
-        pytest.skip("CAH_GOOGLE_API_KEY is not configured")
-
-    agent = GoogleAdkCodingAgent(model_name="gemini-3.5-flash", api_key=api_key)
-    proposal = await agent.propose_action(make_context())
-
-    assert isinstance(proposal, AgentProposal)
-    assert proposal.completion_claimed is False

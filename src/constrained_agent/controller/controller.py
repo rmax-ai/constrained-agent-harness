@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -12,17 +13,26 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from constrained_agent.agents.adk_nodes import (
+    ProposalValidationResult,
+    create_coding_agent_workflow,
+)
+from constrained_agent.agents.google_adk import GoogleAdkCodingAgent
 from constrained_agent.agents.protocol import AgentContext, AgentProposal, FileEdit
+from constrained_agent.agents.replay import ReplayAgent
+from constrained_agent.agents.scripted import ScriptedAgent
 from constrained_agent.artifacts import ArtifactStore, CompletionManifest, generate_manifest
+from constrained_agent.context import ContextBuilder
 from constrained_agent.domain.budgets import BudgetTracker
 from constrained_agent.domain.candidates import Candidate, CandidateStatus
 from constrained_agent.domain.contracts import ContractValidator, GoalContract
 from constrained_agent.domain.evaluations import EvaluationVector
 from constrained_agent.domain.events import Event, EventType, TransitionDecision, TransitionEvent
-from constrained_agent.domain.evidence import ArtifactRef
+from constrained_agent.domain.evidence import ArtifactRef, Evidence
 from constrained_agent.domain.runs import Run, RunStatus
 from constrained_agent.errors import (
     BudgetExceededError,
+    ConfigurationError,
     GoalValidationError,
     RepositoryStateError,
 )
@@ -271,7 +281,11 @@ class Controller:
         sandbox: Sandbox,
         repository_store: RepositoryStore,
         evaluator_pipeline: EvaluatorPipeline,
-        agent: CodingAgent,
+        agent: CodingAgent | None = None,
+        agent_type: str | None = None,
+        model_name: str | None = None,
+        scripted_proposals: Sequence[AgentProposal] | None = None,
+        replay_source: Path | str | None = None,
         artifact_store: ArtifactStore,
         event_store: ControllerEventStore,
         budget_tracker: BudgetTracker,
@@ -281,7 +295,6 @@ class Controller:
         self._sandbox = sandbox
         self._repository_store = repository_store
         self._evaluator_pipeline = evaluator_pipeline
-        self._agent = agent
         self._artifact_store = artifact_store
         self._event_store = event_store
         self._budget_tracker = budget_tracker
@@ -289,6 +302,22 @@ class Controller:
         self._run_id = uuid4()
         self._state_machine = StateMachine(run_id=self._run_id)
         self._policy_engine = PolicyEngine(goal_contract)
+        self._agent = self._resolve_agent(
+            goal_contract=goal_contract,
+            agent=agent,
+            agent_type=agent_type,
+            model_name=model_name,
+            scripted_proposals=scripted_proposals,
+            replay_source=replay_source,
+        )
+        self._context_builder = ContextBuilder(goal_contract, repository_store)
+        self._adk_workflow = None
+        if isinstance(self._agent, GoogleAdkCodingAgent):
+            self._adk_workflow = create_coding_agent_workflow(
+                context_builder=self._context_builder,
+                agent=self._agent,
+                policy_engine=self._policy_engine,
+            )
 
     async def run(self) -> CompletionManifest | None:
         """Execute the full controller lifecycle."""
@@ -363,14 +392,24 @@ class Controller:
                     iteration=iteration,
                     reason="prepare fresh context",
                 )
-                context = self._build_context(iteration, history, active_state)
+                context = await self._build_context(run, history[-1])
                 await self._transition(
                     ControllerState.AWAITING_PROPOSAL,
                     TransitionDecision.ACCEPT,
                     iteration=iteration,
                     reason="context ready",
                 )
-                proposal = await self._agent.propose_action(context)
+                policy_report = None
+                if isinstance(self._agent, GoogleAdkCodingAgent):
+                    workflow_result = await self._run_google_adk_workflow(
+                        run=run,
+                        candidate=history[-1],
+                    )
+                    context = workflow_result["context"]
+                    proposal = workflow_result["proposal"]
+                    policy_report = workflow_result["policy_report"]
+                else:
+                    proposal = await self._agent.propose_action(context)
                 self._budget_tracker.record_model_call(0, 0)
                 await self._record_event(
                     EventType.MODEL_CALL,
@@ -394,7 +433,8 @@ class Controller:
                     reason="proposal received",
                 )
                 proposal = self._normalized_proposal(proposal)
-                policy_report = self._policy_engine.check_proposal(proposal, workspace)
+                if policy_report is None:
+                    policy_report = self._policy_engine.check_proposal(proposal, workspace)
                 await self._record_event(
                     EventType.POLICY_CHECK,
                     iteration=iteration,
@@ -659,34 +699,53 @@ class Controller:
         if errors:
             raise GoalValidationError("; ".join(errors))
 
-    def _build_context(
+    async def _build_context(
         self,
-        iteration: int,
-        history: list[Candidate],
-        active_state: RepositoryState,
+        run: Run,
+        candidate: Candidate,
     ) -> AgentContext:
-        previous = history[-1].evaluation
-        failures = ""
-        if previous is not None:
-            failures = json.dumps(previous.model_dump(mode="json"), sort_keys=True)
-        return AgentContext(
-            goal_summary=self._goal_contract.task.description,
-            repository_map=self._repository_map(),
-            candidate_diff=self._safe_diff(history, active_state),
-            evaluation_failures=failures,
-            prior_rejected=", ".join(
-                str(candidate.id)
-                for candidate in history
-                if candidate.status is CandidateStatus.REJECTED
-            ),
-            remaining_budget=json.dumps(
-                self._budget_tracker.remaining().model_dump(mode="json"),
-                sort_keys=True,
-            ),
-            permitted_actions=["edit writable files", "run allowed commands"],
-            protected_summary=", ".join(self._goal_contract.constraints.protected_paths) or "none",
-            iteration=iteration,
+        return await self._context_builder.build(
+            run,
+            candidate,
+            self._evidence_from_events(),
+            self._stagnation_report(candidate),
         )
+
+    async def _run_google_adk_workflow(
+        self,
+        *,
+        run: Run,
+        candidate: Candidate,
+    ) -> dict[str, AgentContext | AgentProposal | Any]:
+        if self._adk_workflow is None or not isinstance(self._agent, GoogleAdkCodingAgent):
+            raise ConfigurationError("google-adk workflow requested without a GoogleAdkCodingAgent")
+        if self._adk_workflow.graph is None:
+            raise ConfigurationError("google-adk workflow graph was not constructed")
+
+        nodes = {node.name: node for node in self._adk_workflow.graph.nodes}
+        prepare = nodes["prepare_context"]
+        invoke = nodes["invoke_agent"]
+        validate = nodes["validate"]
+        if not hasattr(prepare, "execute") or not hasattr(invoke, "execute") or not hasattr(
+            validate, "execute"
+        ):
+            raise ConfigurationError("google-adk workflow nodes do not expose execute()")
+
+        context = await prepare.execute(
+            run=run,
+            candidate=candidate,
+            evidence=self._evidence_from_events(),
+            stagnation_report=self._stagnation_report(candidate),
+        )
+        proposal = await invoke.execute(context=context)
+        validation = validate.execute(proposal=proposal, workspace=self._workspace())
+        if not isinstance(validation, ProposalValidationResult):
+            raise ConfigurationError("google-adk workflow returned an unexpected validation result")
+        return {
+            "context": context,
+            "proposal": validation.proposal,
+            "policy_report": validation.policy_report,
+        }
 
     async def _evaluate(self, repository_state: RepositoryState) -> EvaluationVector:
         context = EvaluationContext(
@@ -819,6 +878,34 @@ class Controller:
                 break
         return "\n".join(paths)
 
+    def _evidence_from_events(self) -> list[Evidence]:
+        evidence: list[Evidence] = []
+        for event in self._event_store.list_events(str(self._run_id)):
+            raw_candidate_id = event.payload.get("candidate_id")
+            evidence.append(
+                Evidence(
+                    id=event.id,
+                    run_id=event.run_id,
+                    iteration=event.iteration,
+                    candidate_id=UUID(raw_candidate_id)
+                    if isinstance(raw_candidate_id, str)
+                    else None,
+                    event_type=event.event_type.value,
+                    payload=dict(event.payload),
+                    artifact_refs=[],
+                    timestamp=event.timestamp,
+                )
+            )
+        return evidence
+
+    def _stagnation_report(self, candidate: Candidate) -> dict[str, Any]:
+        if candidate.evaluation is None:
+            return {}
+        return {
+            "evaluation_vector": candidate.evaluation.model_dump(mode="json"),
+            "evaluation_results": [],
+        }
+
     def _workspace(self) -> Path:
         workspace = getattr(self._repository_store, "workspace", None)
         if workspace is None:
@@ -943,3 +1030,36 @@ class Controller:
             if isinstance(container_image, str) and container_image != "":
                 return container_image
         return None
+
+    @staticmethod
+    def _resolve_agent(
+        *,
+        goal_contract: GoalContract,
+        agent: CodingAgent | None,
+        agent_type: str | None,
+        model_name: str | None,
+        scripted_proposals: Sequence[AgentProposal] | None,
+        replay_source: Path | str | None,
+    ) -> CodingAgent:
+        if agent is not None:
+            return agent
+
+        resolved_type = (agent_type or goal_contract.model.provider).strip().lower()
+        if resolved_type == "google-adk":
+            return GoogleAdkCodingAgent(
+                model_name=model_name,
+                goal_model=goal_contract.model.name,
+            )
+        if resolved_type == "scripted":
+            if scripted_proposals is None:
+                raise ConfigurationError(
+                    "scripted agent selection requires scripted_proposals or an explicit agent"
+                )
+            return ScriptedAgent(scripted_proposals)
+        if resolved_type == "replay":
+            if replay_source is None:
+                raise ConfigurationError(
+                    "replay agent selection requires replay_source or an explicit agent"
+                )
+            return ReplayAgent(replay_source)
+        raise ConfigurationError(f"unsupported agent type: {resolved_type}")
