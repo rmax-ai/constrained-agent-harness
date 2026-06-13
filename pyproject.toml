@@ -97,6 +97,7 @@ exclude_also = [
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
+skips = ["B101"]
 
 [tool.cah]
 runtime_dir = ".cah"

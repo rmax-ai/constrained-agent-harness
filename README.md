@@ -1,5 +1,9 @@
 # constrained-agent-harness
 
+[![CI](https://github.com/rmax-ai/constrained-agent-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/rmax-ai/constrained-agent-harness/actions/workflows/ci.yml)
+![Python Version](https://img.shields.io/badge/python-3.13-blue)
+![License](https://img.shields.io/badge/license-Apache--2.0-green)
+
 **A reference harness for running coding agents as bounded, verifiable search over repository states.**
 
 This repository implements the reference architecture described in
@@ -28,95 +32,56 @@ complete. The model never makes the authoritative completion decision.
 
 ## What This Repository Contains
 
-- A **state machine controller** that enforces bounded execution
+- **State machine controller** — bounded execution with 7 transition decisions
 - **Goal contracts** — typed YAML specifications of task bounds
 - **Policy engine** — path, command, and dependency enforcement
 - **Sandbox** — Docker-isolated command execution
 - **Git-backed repository store** — immutable checkpoints with rollback
-- **Evaluator pipeline** — plugin-based quality and safety checks
+- **Evaluator pipeline** — tiered plugin-based quality and safety checks
 - **Hidden verification** — protected tests invisible to the agent
 - **Context reconstruction** — fresh-session context per iteration
-- **Artifact store** — append-only hash chain evidence
-- **4 experiment modes** for controlled comparison
+- **Artifact store** — append-only SHA-256 hash chain evidence
+- **Telemetry** — runtime gauges, structured logging, run summaries
 - **Benchmark**: payment webhook idempotency
 
-## What This Repository Does NOT Provide
-
-- A general replacement for coding-agent products
-- Distributed execution or Kubernetes orchestration
-- Arbitrary shell access to the host
-- Multi-tenant operation
-- Automatic PR merging
-- Unrestricted MCP integration
-- A broad multi-agent organization
-- Support for every programming language
-
-## Quick Start: Scripted Demo (no API credentials required)
+## Quick Start
 
 ```bash
 # Install
-uv sync --frozen
+uv sync
 
-# Verify prerequisites
-uv run cah doctor --skip-model
+# Run the scripted benchmark demo (no API credentials required)
+uv run cah run --agent scripted --goal benchmarks/payment_webhook/manifest.yaml
 
-# Validate the benchmark
-uv run cah benchmark validate payment-webhook
+# Generate a report
+uv run cah status <run-id>
 
-# Run a scripted agent end-to-end
-uv run cah run \
-  benchmarks/payment_webhook/goal.yaml \
-  --repo benchmarks/payment_webhook/source_repo \
-  --agent scripted
+# Run a multi-repetition experiment
+uv run cah experiment run --repetitions 3
 ```
 
-## Live Gemini Demo
+## Live Model Demo
 
 ```bash
 export CAH_GOOGLE_API_KEY=your_key_here
-export CAH_MODEL=gemini-3.5-flash
-
-uv run cah run \
-  benchmarks/payment_webhook/goal.yaml \
-  --repo benchmarks/payment_webhook/source_repo \
-  --agent google-adk
+uv run cah run --agent google-adk --goal benchmarks/payment_webhook/manifest.yaml
 ```
 
-## Experiment Modes
+## CLI Reference
 
-| Mode | Description |
-|------|-------------|
-| `long-context-self-check` | Naive baseline — persistent conversation, model claims completion |
-| `fresh-context-visible-tests` | Reconstructed context, visible tests only |
-| `constrained-verification` | Full architecture — policy gates, hidden tests, checkpoint rollback |
-| `constrained-branching` | Same as above + candidate frontier with branching |
-
-```bash
-uv run cah experiment run \
-  --benchmark payment-webhook \
-  --mode constrained-verification \
-  --repetitions 3
-```
-
-## Architecture
-
-```mermaid
-graph TD
-    GC[Goal Contract] --> C[Controller]
-    SA[Sandbox] --> C
-    RE[Repository Store] --> C
-    EP[Evaluator Pipeline] --> C
-    AS[Artifact Store] --> C
-    PM[Policy Engine] --> C
-    AG[Coding Agent] --> C
-    C --> SM[State Machine]
-    SM --> TD{Transition Decision}
-    TD -->|ACCEPT| CP[Checkpoint]
-    TD -->|REJECT| BK[Backtrack]
-    TD -->|ROLLBACK| RS[Restore]
-    TD -->|COMPLETE| CM[Completion Manifest]
-    TD -->|FAIL| FE[Failure Record]
-```
+| Command | Description |
+|---------|-------------|
+| `cah run` | Execute a run against a goal |
+| `cah status` | One-line run status |
+| `cah report run` | Detailed run report |
+| `cah report compare` | Side-by-side run comparison |
+| `cah report experiment` | List all runs for an experiment mode |
+| `cah experiment run` | Run multi-repetition experiment |
+| `cah artifacts verify` | Verify artifact hash chain |
+| `cah inspect` | Inspect runs, events, candidates |
+| `cah db upgrade` | Run schema migrations |
+| `cah doctor` | System health check |
+| `cah init` | Initialize runtime directory |
 
 ## Project Structure
 
@@ -126,27 +91,26 @@ src/constrained_agent/
   domain/       — Typed contracts and domain models
   controller/   — State machine and transition logic
   agents/       — Model adapters (ADK, scripted, replay)
-  context/      — Context reconstruction
+  context/      — Fresh-session context reconstruction
   policy/       — Path, command, dependency enforcement
   sandbox/      — Docker and fake sandbox
   repository/   — Git-backed repository store
   evaluators/   — Quality and safety check pipeline
-  persistence/  — SQLite event store
+  persistence/  — SQLite event store (SQLAlchemy + Alembic)
   artifacts/    — Evidence and hash chain
   reporting/    — Run and experiment reports
+  telemetry/    — Runtime gauges, logging, run summaries
 ```
 
 ## Documentation
 
-Full documentation is available at [docs/](docs/):
+Full documentation at [docs/](docs/):
 
 - [Architecture](docs/architecture.md)
-- [State Machine](docs/state-machine.md)
-- [Goal Contract](docs/goal-contract.md)
-- [Evaluation Model](docs/evaluation-model.md)
-- [Sandbox and Threat Model](docs/threat-model.md)
-- [Experimental Modes](docs/experimental-modes.md)
-- [Limitations](docs/limitations.md)
+- [Getting Started](docs/getting-started.md)
+- [Domain Model](docs/domain.md)
+- [Benchmarks](docs/benchmarks.md)
+- [CLI Reference](docs/cli.md)
 
 ## License
 
