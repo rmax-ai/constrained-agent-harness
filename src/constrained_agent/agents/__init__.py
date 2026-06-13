@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
-from constrained_agent.agents.protocol import AgentProposal, CodingAgent, ProposedCommand
+from constrained_agent.agents.protocol import (
+    AgentContext,
+    AgentProposal,
+    CodingAgent,
+    CommandRequest,
+    FileEdit,
+    ProposedCommand,
+)
 
 __all__ = [
+    "AgentContext",
     "AgentProposal",
     "CodingAgent",
+    "CommandRequest",
+    "FileEdit",
     "ProposedCommand",
 ]
 
