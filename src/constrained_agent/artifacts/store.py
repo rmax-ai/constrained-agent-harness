@@ -45,3 +45,16 @@ class ArtifactStore:
         if artifact_path.stat().st_size != ref.size_bytes:
             return False
         return verify_file(artifact_path, ref.hash)
+
+    def find_by_hash(self, artifact_hash: str) -> ArtifactRef | None:
+        """Resolve an artifact reference from its content hash."""
+        matches = sorted(self._artifact_root.glob(f"{artifact_hash}.*"))
+        if not matches:
+            return None
+        artifact_path = matches[0]
+        return ArtifactRef(
+            path=str(artifact_path),
+            hash=artifact_hash,
+            size_bytes=artifact_path.stat().st_size,
+            description=None,
+        )
