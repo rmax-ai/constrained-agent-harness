@@ -590,6 +590,23 @@ class Controller:
                         self._artifact_store,
                         self._event_store,
                     )
+                    manifest_artifact = self._artifact_store.store(
+                        "completion-manifest.json",
+                        last_manifest.model_dump_json(indent=2),
+                        description="verified completion manifest",
+                    )
+                    await self._event_store.record_artifact(run.id, manifest_artifact)
+                    await self._record_event(
+                        EventType.ARTIFACT_STORED,
+                        iteration=iteration,
+                        payload={
+                            "artifact_hash": manifest_artifact.hash,
+                            "artifact_path": manifest_artifact.path,
+                            "description": manifest_artifact.description,
+                        },
+                        source_state=self._state_machine.current_state.value,
+                        target_state=self._state_machine.current_state.value,
+                    )
                     return last_manifest
 
                 if vector.is_acceptable(self._goal_contract):

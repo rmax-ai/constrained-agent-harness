@@ -6,10 +6,15 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.table import Table
 
 from constrained_agent import __version__
-from constrained_agent.logging import configure_logging, get_logger
+from constrained_agent.cli._common import upgrade_database
+from constrained_agent.cli.benchmark import benchmark_app
+from constrained_agent.cli.doctor import doctor_command
+from constrained_agent.cli.experiment import experiment_app
+from constrained_agent.cli.inspect import inspect_app
+from constrained_agent.cli.report import artifacts_app, report_app
+from constrained_agent.logging import configure_logging
 from constrained_agent.settings import Settings
 
 app = typer.Typer(
@@ -18,7 +23,6 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
-logger = get_logger(__name__)
 
 
 def _version_callback(value: bool) -> None:
@@ -35,82 +39,25 @@ def main(
     log_level: str | None = typer.Option(None, "--log-level", help="Log level override"),
 ) -> None:
     """CAH: constrained-agent-harness CLI."""
+    del version
     settings = Settings()
     level = log_level or settings.log_level
     configure_logging(level if not verbose else "DEBUG")
     ctx.obj = {"settings": settings, "verbose": verbose}
 
 
-@app.command()
-def doctor(
-    ctx: typer.Context,
-    skip_model: bool = typer.Option(False, "--skip-model", help="Skip model accessibility check"),
-) -> None:
-    """Verify system prerequisites."""
-    console.print("[bold green]CAH Doctor[/bold green]")
-    console.print(f"Version: {__version__}")
-    console.print()
-
-    checks: list[tuple[str, bool, str]] = []
-
-    # Python version
-    import sys
-
-    py_ok = sys.version_info >= (3, 13)
-    checks.append(("Python >= 3.13", py_ok, sys.version.split()[0]))
-
-    # Git
-    import shutil
-
-    git_path = shutil.which("git")
-    git_ok = git_path is not None
-    checks.append(("Git available", git_ok, git_path or "not found"))
-
-    # Docker
-    docker_path = shutil.which("docker")
-    docker_ok = docker_path is not None
-    checks.append(
-        ("Docker available", docker_ok, docker_path or "not found (optional for scripted mode)")
-    )
-
-    # Google credentials
-    settings: Settings = ctx.obj["settings"]
-    creds_ok = bool(settings.google_api_key) or settings.use_vertex_ai
-    checks.append(
-        (
-            "Google credentials configured",
-            creds_ok,
-            "yes" if creds_ok else "no (needed for google-adk agent)",
-        )
-    )
-
-    # Runtime dir
-    runtime_dir = settings.runtime_dir
-    runtime_ok = True
-    checks.append(("Runtime directory", runtime_ok, str(runtime_dir.resolve())))
-
-    # Evaluator tools
-    for tool_name in ["pytest", "ruff", "mypy"]:
-        tool_path = shutil.which(tool_name)
-        checks.append((f"Evaluator: {tool_name}", tool_path is not None, tool_path or "not found"))
-
-    table = Table(show_header=False)
-    table.add_column("Check", style="cyan")
-    table.add_column("Status", style="bold")
-    table.add_column("Detail")
-
-    for name, ok, detail in checks:
-        status = "✓" if ok else "✗"
-        style = "green" if ok else "red"
-        table.add_row(name, f"[{style}]{status}[/{style}]", detail)
-
-    console.print(table)
+app.command("doctor")(doctor_command)
+app.add_typer(inspect_app, name="inspect")
+app.add_typer(report_app, name="report")
+app.add_typer(artifacts_app, name="artifacts")
+app.add_typer(benchmark_app, name="benchmark")
+app.add_typer(experiment_app, name="experiment")
 
 
 @app.command()
 def init(
     ctx: typer.Context,
-    path: Path = typer.Option(".", "--path", "-p", help="Project path"),
+    path: Path = typer.Option(".", "--path", "-p", help="Project path"),  # noqa: B008
 ) -> None:
     """Initialize a CAH runtime directory."""
     settings: Settings = ctx.obj["settings"]
@@ -123,17 +70,23 @@ def init(
 @app.command()
 def validate_goal(
     ctx: typer.Context,
-    goal_path: Path = typer.Argument(..., help="Path to goal.yaml"),
+    goal_path: Path = typer.Argument(..., help="Path to goal.yaml"),  # noqa: B008
 ) -> None:
     """Validate a goal contract file."""
+    del ctx
     console.print(f"[yellow]validate-goal: {goal_path} (not yet implemented)[/yellow]")
 
 
 @app.command()
 def run(
     ctx: typer.Context,
-    goal: Path = typer.Argument(..., help="Path to goal.yaml"),
-    repo: Path = typer.Option(Path("."), "--repo", "-r", help="Path to target repository"),
+    goal: Path = typer.Argument(..., help="Path to goal.yaml"),  # noqa: B008
+    repo: Path = typer.Option(  # noqa: B008
+        Path("."),
+        "--repo",
+        "-r",
+        help="Path to target repository",
+    ),
     agent: str = typer.Option(
         "scripted", "--agent", "-a", help="Agent type: scripted, google-adk, replay"
     ),
@@ -141,6 +94,7 @@ def run(
     mode: str = typer.Option("constrained-verification", "--mode", help="Experiment mode"),
 ) -> None:
     """Execute a run against a target repository."""
+    del ctx, model
     console.print(
         f"[yellow]run: {goal} repo={repo} agent={agent} mode={mode} (not yet implemented)[/yellow]"
     )
@@ -152,6 +106,7 @@ def resume(
     run_id: str = typer.Argument(..., help="Run ID to resume"),
 ) -> None:
     """Resume an interrupted run."""
+    del ctx
     console.print(f"[yellow]resume: {run_id} (not yet implemented)[/yellow]")
 
 
@@ -161,7 +116,23 @@ def cancel(
     run_id: str = typer.Argument(..., help="Run ID to cancel"),
 ) -> None:
     """Cancel a running or paused run."""
+    del ctx
     console.print(f"[yellow]cancel: {run_id} (not yet implemented)[/yellow]")
+
+
+db_app = typer.Typer(help="Database utilities")
+
+
+@db_app.command("upgrade")
+def db_upgrade(ctx: typer.Context) -> None:
+    """Run database schema upgrades."""
+    settings: Settings = ctx.obj["settings"]
+    del ctx
+    upgrade_database(settings)
+    console.print(f"[green]database upgraded at {settings.database_url}[/green]")
+
+
+app.add_typer(db_app, name="db")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -27,6 +29,7 @@ class DatabaseEngine:
         """Return the lazily initialized engine."""
         if self._engine is None:
             database_url = _normalize_database_url(self._settings.database_url)
+            _ensure_database_parent(database_url)
             self._engine = create_async_engine(database_url, future=True)
             self._session_factory = async_sessionmaker(
                 self._engine,
@@ -59,3 +62,14 @@ def _normalize_database_url(database_url: str) -> str:
     if url.drivername == "sqlite":
         return str(url.set(drivername="sqlite+aiosqlite"))
     return database_url
+
+
+def _ensure_database_parent(database_url: str) -> None:
+    """Create parent directories for local SQLite databases."""
+    url = make_url(database_url)
+    if not url.drivername.startswith("sqlite"):
+        return
+    database = url.database
+    if database in (None, "", ":memory:"):
+        return
+    Path(database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
