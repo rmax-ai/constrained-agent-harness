@@ -1,0 +1,41 @@
+schema_version: "1.0"
+task:
+  id: payment-webhook-idempotency
+  title: Prevent duplicate payment creation
+  description: >
+    Modify the target repository so that duplicate webhook deliveries
+    do not create duplicate payment records.
+acceptance:
+  required_checks:
+    - id: unit-tests
+      evaluator: pytest
+      command: ["pytest", "-q"]
+      expected_exit_code: 0
+      blocking: true
+    - id: type-check
+      evaluator: mypy
+      command: ["mypy", "src"]
+      expected_exit_code: 0
+      blocking: true
+  hidden_checks:
+    directory: ../protected_tests
+    writable: false
+    reveal_failures_to_agent: summary_only
+constraints:
+  max_iterations: 20
+  max_runtime_seconds: 3600
+  writable_paths: ["src/"]
+  protected_paths: ["tests/", "pyproject.toml"]
+  allowed_commands: ["pytest", "mypy", "python", "git", "cat", "grep", "find"]
+  forbidden_patterns: ["rm -rf", "curl", "wget"]
+  network:
+    mode: disabled
+  dependencies:
+    allow_changes: false
+termination:
+  success:
+    require_all_blocking_checks: true
+    require_hidden_checks: true
+  failure:
+    - iteration_limit_reached
+    - runtime_budget_exhausted

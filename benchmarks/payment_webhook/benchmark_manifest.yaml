@@ -1,0 +1,7 @@
+name: payment-webhook
+title: Payment Webhook Idempotency
+description: >
+  Fix duplicate payment creation from duplicate webhook deliveries.
+language: python
+framework: fastapi
+default_goal: goal.yaml

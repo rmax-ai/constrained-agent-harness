@@ -104,6 +104,15 @@ default_model = "gemini-3.5-flash"
 default_sandbox_image = "python:3.13-slim"
 database_url = "sqlite:///.cah/cah.db"
 
+[tool.hatch.build]
+include = [
+    "src/constrained_agent",
+    "benchmarks/payment_webhook/**",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"benchmarks/payment_webhook" = "benchmarks/payment_webhook"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/constrained_agent"]
 
