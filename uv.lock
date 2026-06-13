@@ -334,6 +334,7 @@ name = "constrained-agent-harness"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiosqlite" },
     { name = "alembic" },
     { name = "docker" },
     { name = "google-adk" },
@@ -368,6 +369,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiosqlite", specifier = ">=0.20" },
     { name = "alembic", specifier = ">=1.13" },
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7" },
     { name = "docker", specifier = ">=7.0" },

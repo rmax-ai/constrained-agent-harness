@@ -114,16 +114,14 @@ def test_forbidden_patterns_are_caught(tmp_path: Path) -> None:
 
 
 def test_dependency_changes_detected(tmp_path: Path) -> None:
-    engine = PolicyEngine(
-        make_contract(approval_gates=[ApprovalGate.DEPENDENCY_CHANGE.value])
-    )
+    engine = PolicyEngine(make_contract(approval_gates=[ApprovalGate.DEPENDENCY_CHANGE.value]))
     proposal = AgentProposal(
         diff=(
             "diff --git a/pyproject.toml b/pyproject.toml\n"
             "--- a/pyproject.toml\n"
             "+++ b/pyproject.toml\n"
             "@@ -1,3 +1,4 @@\n"
-            "+httpx = \">=0.28\"\n"
+            '+httpx = ">=0.28"\n'
         )
     )
 
