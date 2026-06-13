@@ -55,11 +55,13 @@ def doctor(
 
     # Python version
     import sys
+
     py_ok = sys.version_info >= (3, 13)
     checks.append(("Python >= 3.13", py_ok, sys.version.split()[0]))
 
     # Git
     import shutil
+
     git_path = shutil.which("git")
     git_ok = git_path is not None
     checks.append(("Git available", git_ok, git_path or "not found"))
@@ -67,12 +69,20 @@ def doctor(
     # Docker
     docker_path = shutil.which("docker")
     docker_ok = docker_path is not None
-    checks.append(("Docker available", docker_ok, docker_path or "not found (optional for scripted mode)"))
+    checks.append(
+        ("Docker available", docker_ok, docker_path or "not found (optional for scripted mode)")
+    )
 
     # Google credentials
     settings: Settings = ctx.obj["settings"]
     creds_ok = bool(settings.google_api_key) or settings.use_vertex_ai
-    checks.append(("Google credentials configured", creds_ok, "yes" if creds_ok else "no (needed for google-adk agent)"))
+    checks.append(
+        (
+            "Google credentials configured",
+            creds_ok,
+            "yes" if creds_ok else "no (needed for google-adk agent)",
+        )
+    )
 
     # Runtime dir
     runtime_dir = settings.runtime_dir
@@ -124,12 +134,16 @@ def run(
     ctx: typer.Context,
     goal: Path = typer.Argument(..., help="Path to goal.yaml"),
     repo: Path = typer.Option(Path("."), "--repo", "-r", help="Path to target repository"),
-    agent: str = typer.Option("scripted", "--agent", "-a", help="Agent type: scripted, google-adk, replay"),
+    agent: str = typer.Option(
+        "scripted", "--agent", "-a", help="Agent type: scripted, google-adk, replay"
+    ),
     model: str | None = typer.Option(None, "--model", "-m", help="Model override"),
     mode: str = typer.Option("constrained-verification", "--mode", help="Experiment mode"),
 ) -> None:
     """Execute a run against a target repository."""
-    console.print(f"[yellow]run: {goal} repo={repo} agent={agent} mode={mode} (not yet implemented)[/yellow]")
+    console.print(
+        f"[yellow]run: {goal} repo={repo} agent={agent} mode={mode} (not yet implemented)[/yellow]"
+    )
 
 
 @app.command()

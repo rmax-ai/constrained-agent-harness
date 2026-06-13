@@ -128,13 +128,19 @@ _DECISION_TABLE: dict[tuple[ControllerState, ControllerState], tuple[TransitionD
     (ControllerState.CREATED, ControllerState.INITIALIZING): (TransitionDecision.ACCEPT,),
     (ControllerState.CREATED, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.CREATED, ControllerState.FAILED): (TransitionDecision.FAIL,),
-    (ControllerState.INITIALIZING, ControllerState.BASELINE_EVALUATION): (TransitionDecision.ACCEPT,),
+    (ControllerState.INITIALIZING, ControllerState.BASELINE_EVALUATION): (
+        TransitionDecision.ACCEPT,
+    ),
     (ControllerState.INITIALIZING, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.INITIALIZING, ControllerState.FAILED): (TransitionDecision.FAIL,),
-    (ControllerState.BASELINE_EVALUATION, ControllerState.BUILDING_CONTEXT): (TransitionDecision.ACCEPT,),
+    (ControllerState.BASELINE_EVALUATION, ControllerState.BUILDING_CONTEXT): (
+        TransitionDecision.ACCEPT,
+    ),
     (ControllerState.BASELINE_EVALUATION, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.BASELINE_EVALUATION, ControllerState.FAILED): (TransitionDecision.FAIL,),
-    (ControllerState.BUILDING_CONTEXT, ControllerState.AWAITING_PROPOSAL): (TransitionDecision.ACCEPT,),
+    (ControllerState.BUILDING_CONTEXT, ControllerState.AWAITING_PROPOSAL): (
+        TransitionDecision.ACCEPT,
+    ),
     (ControllerState.BUILDING_CONTEXT, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.BUILDING_CONTEXT, ControllerState.FAILED): (TransitionDecision.FAIL,),
     (ControllerState.AWAITING_PROPOSAL, ControllerState.POLICY_CHECK): (TransitionDecision.ACCEPT,),
@@ -166,7 +172,9 @@ _DECISION_TABLE: dict[tuple[ControllerState, ControllerState], tuple[TransitionD
     ),
     (ControllerState.CHECKPOINTING, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.CHECKPOINTING, ControllerState.FAILED): (TransitionDecision.FAIL,),
-    (ControllerState.EVALUATING, ControllerState.SELECTING_TRANSITION): (TransitionDecision.ACCEPT,),
+    (ControllerState.EVALUATING, ControllerState.SELECTING_TRANSITION): (
+        TransitionDecision.ACCEPT,
+    ),
     (ControllerState.EVALUATING, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.EVALUATING, ControllerState.FAILED): (TransitionDecision.FAIL,),
     (ControllerState.SELECTING_TRANSITION, ControllerState.BUILDING_CONTEXT): (
@@ -184,9 +192,7 @@ _DECISION_TABLE: dict[tuple[ControllerState, ControllerState], tuple[TransitionD
     ),
     (ControllerState.SELECTING_TRANSITION, ControllerState.CANCELLED): (TransitionDecision.FAIL,),
     (ControllerState.SELECTING_TRANSITION, ControllerState.FAILED): (TransitionDecision.FAIL,),
-    (ControllerState.AWAITING_APPROVAL, ControllerState.POLICY_CHECK): (
-        TransitionDecision.ACCEPT,
-    ),
+    (ControllerState.AWAITING_APPROVAL, ControllerState.POLICY_CHECK): (TransitionDecision.ACCEPT,),
     (ControllerState.AWAITING_APPROVAL, ControllerState.SELECTING_TRANSITION): (
         TransitionDecision.REJECT,
         TransitionDecision.ROLLBACK,
