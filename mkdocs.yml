@@ -1,0 +1,38 @@
+site_name: Constrained Agent Harness
+site_description: A reference implementation of a verifiable, bounded autonomous agent system
+repo_url: https://github.com/rmax-ai/constrained-agent-harness
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Domain Model: domain.md
+  - Benchmarks: benchmarks.md
+  - CLI Reference: cli.md

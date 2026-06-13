@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from constrained_agent import __version__
-from constrained_agent.cli._common import upgrade_database
+from constrained_agent.cli._common import load_run_data, run_async, upgrade_database
 from constrained_agent.cli.benchmark import benchmark_app
 from constrained_agent.cli.doctor import doctor_command
 from constrained_agent.cli.experiment import experiment_app
@@ -122,6 +122,28 @@ def cancel(
     """Cancel a running or paused run."""
     del ctx
     console.print(f"[yellow]cancel: {run_id} (not yet implemented)[/yellow]")
+
+
+@app.command()
+def status(
+    ctx: typer.Context,
+    run_id: str = typer.Argument(..., help="Run ID to query"),
+) -> None:
+    """Print a one-line status for a run."""
+    from constrained_agent.telemetry.run_summary import RunSummary
+
+    settings: Settings = ctx.obj["settings"]
+    try:
+        data = run_async(load_run_data(settings, run_id))
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    summary = RunSummary.from_events(
+        run_id, data["events"],
+        start_time=data["run"].created_at,
+        end_time=data["run"].updated_at,
+    )
+    console.print(summary.to_terminal())
 
 
 db_app = typer.Typer(help="Database utilities")
