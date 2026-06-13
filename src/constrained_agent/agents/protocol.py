@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class FileEdit(BaseModel):
@@ -23,6 +23,21 @@ class FileEdit(BaseModel):
         if value.strip() == "":
             raise ValueError("path must be a non-empty string")
         return value
+
+    @model_validator(mode="after")
+    def _validate_payload(self) -> FileEdit:
+        if self.operation in {"create", "replace"}:
+            if self.content is None:
+                raise ValueError(f"{self.operation} edits require content")
+            if self.unified_diff is not None:
+                raise ValueError(f"{self.operation} edits must not include unified_diff")
+        elif self.operation == "patch":
+            if self.unified_diff is None:
+                raise ValueError("patch edits require unified_diff")
+        elif self.operation == "delete":
+            if self.content is not None or self.unified_diff is not None:
+                raise ValueError("delete edits must not include content or unified_diff")
+        return self
 
 
 class CommandRequest(BaseModel):
