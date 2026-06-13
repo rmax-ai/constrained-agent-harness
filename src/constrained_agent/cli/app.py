@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from constrained_agent import __version__
-from constrained_agent.settings import Settings
 from constrained_agent.logging import configure_logging, get_logger
+from constrained_agent.settings import Settings
 
 app = typer.Typer(
     name="cah",
@@ -33,7 +32,7 @@ def main(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", callback=_version_callback, is_eager=True),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    log_level: Optional[str] = typer.Option(None, "--log-level", help="Log level override"),
+    log_level: str | None = typer.Option(None, "--log-level", help="Log level override"),
 ) -> None:
     """CAH: constrained-agent-harness CLI."""
     settings = Settings()
@@ -126,7 +125,7 @@ def run(
     goal: Path = typer.Argument(..., help="Path to goal.yaml"),
     repo: Path = typer.Option(Path("."), "--repo", "-r", help="Path to target repository"),
     agent: str = typer.Option("scripted", "--agent", "-a", help="Agent type: scripted, google-adk, replay"),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Model override"),
+    model: str | None = typer.Option(None, "--model", "-m", help="Model override"),
     mode: str = typer.Option("constrained-verification", "--mode", help="Experiment mode"),
 ) -> None:
     """Execute a run against a target repository."""

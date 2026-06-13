@@ -1,9 +1,18 @@
 """Evaluator pipeline — plugins for quality and safety checks."""
 
-from constrained_agent.evaluators.protocol import Evaluator, EvaluationContext, EvaluationResult, EvaluationTier
-from constrained_agent.evaluators.pipeline import EvaluatorPipeline, EvaluationVector
+from constrained_agent.evaluators.pipeline import EvaluationVector, EvaluatorPipeline
+from constrained_agent.evaluators.protocol import (
+    EvaluationContext,
+    EvaluationResult,
+    EvaluationTier,
+    Evaluator,
+)
 
 __all__ = [
-    "Evaluator", "EvaluationContext", "EvaluationResult", "EvaluationTier",
-    "EvaluatorPipeline", "EvaluationVector",
+    "EvaluationContext",
+    "EvaluationResult",
+    "EvaluationTier",
+    "EvaluationVector",
+    "Evaluator",
+    "EvaluatorPipeline",
 ]
