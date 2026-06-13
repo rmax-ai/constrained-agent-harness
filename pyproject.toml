@@ -103,6 +103,9 @@ default_model = "gemini-3.5-flash"
 default_sandbox_image = "python:3.13-slim"
 database_url = "sqlite:///.cah/cah.db"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/constrained_agent"]
+
 [build-system]
-requires = ["setuptools>=75"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["hatchling>=1.0"]
+build-backend = "hatchling.build"
